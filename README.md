@@ -17,3 +17,12 @@ No database. Every app's settings live inside its link, so it works on Render's 
 Run locally: `npm install && npm start` then open http://localhost:3000.
 
 Notes: sites that send `X-Frame-Options`/CSP `frame-ancestors` cannot be embedded, so the app opens them directly. The Android/iOS project handles those properly.
+
+## Real .apk / .exe downloads (cloud builds)
+The "Get Android APK" and "Get PC app" buttons trigger GitHub Actions in a builder repo (default `xofcntando/ntandomods-apk-builder`, see `BUILD_REPO`). When the build finishes the file is published as a release and the page shows a direct download link (usually 5 to 10 minutes).
+
+Set these env vars on Render:
+- `BUILD_GITHUB_TOKEN` - GitHub token that can run workflows in the builder repo (fine-grained: Actions read/write + Contents read on that repo; classic: `repo`)
+- `PUBLIC_URL` - your public site URL, e.g. `https://ntandomods-app-maker.onrender.com`
+
+Without `BUILD_GITHUB_TOKEN` the build buttons are hidden and only the zip downloads show.

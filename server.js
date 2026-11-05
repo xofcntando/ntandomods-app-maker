@@ -95,6 +95,59 @@ app.get('/download/:kind/:token.zip', limit(10, 60000), async (req, res) => {
   }
 });
 
+
+/* ---------- Cloud builds (real .apk / .exe / .dmg / .AppImage) ---------- */
+const BUILD_REPO = process.env.BUILD_REPO || 'xofcntando/ntandomods-apk-builder';
+const BUILD_TOKEN = process.env.BUILD_GITHUB_TOKEN || '';
+const gh = (p, opts = {}) => fetch('https://api.github.com' + p, {
+  ...opts,
+  headers: { accept: 'application/vnd.github+json', 'user-agent': 'ntandomods-app-maker', ...(BUILD_TOKEN ? { authorization: 'Bearer ' + BUILD_TOKEN } : {}), ...(opts.headers || {}) },
+  signal: AbortSignal.timeout(10000),
+});
+const WORKFLOW = { a: 'build-apk.yml', d: 'build-desktop.yml' };
+const statusCache = new Map();
+
+app.get('/api/build/enabled', (_, res) => res.json({ enabled: !!BUILD_TOKEN }));
+
+app.post('/api/build', limit(4, 3600000), async (req, res) => {
+  if (!BUILD_TOKEN) return res.status(503).json({ error: 'Cloud builds are not enabled on this server yet.' });
+  try {
+    const kind = req.body && req.body.kind === 'desktop' ? 'd' : 'a';
+    const cfg = decodeCfg(String((req.body && req.body.token) || ''));
+    const token = encodeCfg(cfg);
+    const job = kind + require('crypto').randomBytes(5).toString('hex');
+    const origin = (process.env.PUBLIC_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+    const r = await gh(`/repos/${BUILD_REPO}/actions/workflows/${WORKFLOW[kind]}/dispatches`, {
+      method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { job, origin, token } }),
+    });
+    if (r.status !== 204) { console.error('dispatch failed', r.status, await r.text()); return res.status(502).json({ error: 'Could not start the build. Try again in a minute.' }); }
+    res.json({ job });
+  } catch { res.status(400).json({ error: 'Invalid app settings' }); }
+});
+
+app.get('/api/build/:job', limit(120, 60000), async (req, res) => {
+  const job = req.params.job;
+  if (!/^[ad][0-9a-f]{10}$/.test(job)) return res.status(400).json({ error: 'bad job' });
+  const c = statusCache.get(job);
+  if (c && Date.now() - c.t < 6000) return res.json(c.v);
+  try {
+    const rel = await gh(`/repos/${BUILD_REPO}/releases/tags/${job}`);
+    let v;
+    if (rel.status === 200) {
+      const j = await rel.json();
+      v = { status: 'done', files: j.assets.map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size })) };
+    } else {
+      const runs = await (await gh(`/repos/${BUILD_REPO}/actions/workflows/${WORKFLOW[job[0]]}/runs?event=workflow_dispatch&per_page=30`)).json();
+      const run = (runs.workflow_runs || []).find((x) => x.display_title === `Build ${job}`);
+      if (!run) v = { status: 'queued' };
+      else if (run.status !== 'completed') v = { status: 'building' };
+      else v = { status: 'failed', error: 'The build failed. You can still use the project zip.' };
+    }
+    statusCache.set(job, { t: Date.now(), v });
+    res.json(v);
+  } catch { res.status(502).json({ error: 'Could not check build status' }); }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
 
 const port = process.env.PORT || 3000;

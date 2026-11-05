@@ -86,14 +86,21 @@ details{margin-top:12px;color:var(--mute);font-size:14px}summary{cursor:pointer}
           <a class="btn" id="openApp" target="_blank">Open &amp; install app</a>
           <button class="ghost" id="copyBtn">Copy install link</button>
         </div>
+        <div class="btns" id="buildBtns">
+          <button id="apkBtn">Get Android APK</button>
+          <button id="exeBtn">Get PC app (.exe, Mac, Linux)</button>
+        </div>
+        <div class="msg" id="buildMsg"></div>
+        <div class="btns" id="buildLinks"></div>
         <div class="btns">
-          <a class="btn ghost" id="dlPwa">Download PWA (.zip)</a>
-          <a class="btn ghost" id="dlNative">Download Android/iOS project (.zip)</a>
-          <a class="btn ghost" id="dlDesktop">Download PC app: Windows, Mac, Linux (.zip)</a>
+          <a class="btn ghost" id="dlPwa">PWA files (.zip)</a>
+          <a class="btn ghost" id="dlNative">Android/iOS source (.zip)</a>
+          <a class="btn ghost" id="dlDesktop">PC source (.zip)</a>
         </div>
         <details><summary>Which one do I want?</summary>
           <p><b>Install link</b>: works right now. Open it on your phone, then use <i>Add to Home screen</i> (Android Chrome, iPhone Safari) or the install icon in the desktop address bar.<br><br>
           <b>PWA zip</b>: the same app as static files you can host on your own domain (Netlify, Render static site, any hosting).<br><br>
+          <b>Get Android APK / PC app</b>: we build the real installable file in the cloud and give you a direct download. It takes about 5 to 10 minutes, so keep this page open. The <code>.zip</code> buttons are the source projects if you want to build them yourself.<br><br>
           <b>PC app project</b>: an Electron project that builds a real <code>.exe</code> installer (plus Mac and Linux builds). Push it to GitHub and run the included workflow, and the installers are built for you. You can also just install the link from Chrome or Edge on your PC.<br><br>
           <b>Android/iOS project</b>: a Capacitor project that loads your site in a real native shell. Includes a one-click GitHub workflow that builds the <code>.apk</code> for you.</p>
         </details>
@@ -118,6 +125,8 @@ details{margin-top:12px;color:var(--mute);font-size:14px}summary{cursor:pointer}
 <script>
 const $ = (id) => document.getElementById(id);
 let detected = { framable: true };
+let currentToken = null, buildEnabled = false;
+fetch('/api/build/enabled').then(r => r.json()).then(d => { buildEnabled = d.enabled; if (!d.enabled) $('buildBtns').style.display = 'none'; }).catch(() => {});
 $('yr').textContent = new Date().getFullYear();
 
 function preview() {
@@ -170,7 +179,7 @@ $('makeBtn').onclick = async () => {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    const full = location.origin + d.appUrl;
+    const full = location.origin + d.appUrl; currentToken = d.token; $('buildMsg').textContent = ''; $('buildLinks').innerHTML = '';
     $('rName').textContent = $('name').value + ' is ready';
     $('rNote').textContent = 'Package id for Android: ' + d.appId;
     $('openApp').href = d.appUrl; $('dlPwa').href = d.pwaZip; $('dlNative').href = d.nativeZip; $('dlDesktop').href = d.desktopZip;
@@ -180,6 +189,39 @@ $('makeBtn').onclick = async () => {
   } catch (e) { say(e.message || 'Something went wrong', 'err'); }
   $('makeBtn').disabled = false;
 };
+
+function startBuild(kind, btn) {
+  return async () => {
+    if (!currentToken) return;
+    const label = btn.textContent; btn.disabled = true;
+    $('buildMsg').className = 'msg'; $('buildMsg').textContent = 'Starting the build...'; $('buildLinks').innerHTML = '';
+    try {
+      const r = await fetch('/api/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: currentToken, kind }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      const t0 = Date.now();
+      const poll = async () => {
+        try {
+          const s = await (await fetch('/api/build/' + d.job)).json();
+          if (s.status === 'done') {
+            $('buildMsg').className = 'msg ok'; $('buildMsg').textContent = 'Ready. Download:';
+            $('buildLinks').innerHTML = '';
+            for (const f of s.files) { const a = document.createElement('a'); a.className = 'btn'; a.href = f.url; a.textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)'; $('buildLinks').appendChild(a); }
+            btn.disabled = false; return;
+          }
+          if (s.status === 'failed') throw new Error(s.error || 'Build failed');
+          const m = Math.floor((Date.now() - t0) / 60000);
+          $('buildMsg').textContent = (s.status === 'queued' ? 'Waiting for a build machine' : 'Building your app') + '... ' + m + ' min elapsed (usually 5 to 10 min)';
+        } catch (e) { if (e.message && !/fetch/i.test(e.message)) { $('buildMsg').className = 'msg err'; $('buildMsg').textContent = e.message; btn.disabled = false; return; } }
+        if (Date.now() - t0 > 40 * 60000) { $('buildMsg').className = 'msg err'; $('buildMsg').textContent = 'Timed out. Try again.'; btn.disabled = false; return; }
+        setTimeout(poll, 10000);
+      };
+      poll();
+    } catch (e) { $('buildMsg').className = 'msg err'; $('buildMsg').textContent = e.message || 'Could not start'; btn.disabled = false; }
+  };
+}
+$('apkBtn').onclick = startBuild('apk', $('apkBtn'));
+$('exeBtn').onclick = startBuild('desktop', $('exeBtn'));
 preview();
 </script>
 </body>

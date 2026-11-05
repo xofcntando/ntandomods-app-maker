@@ -9,3 +9,7 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: BUILD_GITHUB_TOKEN
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

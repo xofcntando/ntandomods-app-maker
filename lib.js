@@ -136,6 +136,17 @@ async function buildIcon(src, cfg, size, maskable) {
     .composite([{ input: glyph, gravity: 'center' }]).png().toBuffer();
 }
 
+async function buildForeground(src, cfg, size) {
+  const inner = Math.round(size * 0.6);
+  if (!src) {
+    const first = ([...cfg.n.trim()][0] || 'A').toUpperCase();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="${size * 0.42}" fill="#fff">${esc(first)}</text></svg>`;
+    return sharp(Buffer.from(svg)).png().toBuffer();
+  }
+  const glyph = await sharp(src).resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+  return sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: glyph, gravity: 'center' }]).png().toBuffer();
+}
+
 /* ---------- Config token ---------- */
 function encodeCfg(cfg) { return Buffer.from(JSON.stringify(cfg)).toString('base64url'); }
 function decodeCfg(token) {
@@ -254,6 +265,8 @@ async function pwaFiles(cfg) {
       'icon-maskable-512.png': im512,
     },
     icon1024: i1024,
+    foreground1024: await buildForeground(src, cfg, 1024),
+    background1024: await sharp({ create: { width: 1024, height: 1024, channels: 4, background: cfg.c } }).png().toBuffer(),
     iconMaskable: im512,
   };
 }
@@ -265,7 +278,7 @@ function appId(cfg) {
 }
 
 async function capacitorFiles(cfg) {
-  const { icon1024 } = await pwaFiles(cfg);
+  const { icon1024, foreground1024, background1024 } = await pwaFiles(cfg);
   const id = appId(cfg);
   const pkgName = id.replace(/[^a-z0-9]/g, '-');
   const files = {
@@ -335,7 +348,8 @@ Note: Apple and Google may reject apps that are only a thin website wrapper, so 
   const out = {};
   for (const [k, v] of Object.entries(files)) out[k] = Buffer.from(v);
   out['assets/icon-only.png'] = icon1024;
-  out['assets/icon-foreground.png'] = icon1024;
+  out['assets/icon-foreground.png'] = foreground1024;
+  out['assets/icon-background.png'] = background1024;
   return out;
 }
 
