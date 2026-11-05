@@ -26,3 +26,15 @@ Set these env vars on Render:
 - `PUBLIC_URL` - your public site URL, e.g. `https://ntandomods-app-maker.onrender.com`
 
 Without `BUILD_GITHUB_TOKEN` the build buttons are hidden and only the zip downloads show.
+
+## Custom domains (app.yourshop.com)
+Users enter their domain on the result page and get two DNS records:
+- `CNAME  app.yourshop.com -> <your Render hostname>`
+- `TXT    _site2app.app.yourshop.com -> <app token>`
+
+The server reads the TXT record to decide which app to serve on that domain, so no database is needed.
+The domain also has to be added to the Render service (Render issues the HTTPS certificate). Two ways:
+- Manual: add it in Render > your service > Settings > Custom Domains.
+- Automatic: set `RENDER_API_KEY` and `RENDER_SERVICE_ID` (the `srv-...` id) and the **Connect domain** button adds it for users who have already set their TXT record (proof they control the domain).
+
+Optional: `OWN_HOSTS` (comma-separated hostnames that should always show the App Maker itself, e.g. your own main domain).

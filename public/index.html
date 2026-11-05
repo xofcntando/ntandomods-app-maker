@@ -97,6 +97,12 @@ details{margin-top:12px;color:var(--mute);font-size:14px}summary{cursor:pointer}
           <a class="btn ghost" id="dlNative">Android/iOS source (.zip)</a>
           <a class="btn ghost" id="dlDesktop">PC source (.zip)</a>
         </div>
+        <details id="domBox"><summary>Use your own domain (app.yourshop.com)</summary>
+          <label>Your domain</label>
+          <div class="url-row"><input id="domain" placeholder="app.yourshop.com"><button id="domBtn" class="ghost">Show DNS records</button></div>
+          <div class="msg" id="domMsg"></div>
+          <div id="domRecs"></div>
+        </details>
         <details><summary>Which one do I want?</summary>
           <p><b>Install link</b>: works right now. Open it on your phone, then use <i>Add to Home screen</i> (Android Chrome, iPhone Safari) or the install icon in the desktop address bar.<br><br>
           <b>PWA zip</b>: the same app as static files you can host on your own domain (Netlify, Render static site, any hosting).<br><br>
@@ -222,6 +228,38 @@ function startBuild(kind, btn) {
 }
 $('apkBtn').onclick = startBuild('apk', $('apkBtn'));
 $('exeBtn').onclick = startBuild('desktop', $('exeBtn'));
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function domSay(t, c) { $('domMsg').className = 'msg ' + (c || ''); $('domMsg').textContent = t; }
+$('domBtn').onclick = async () => {
+  if (!currentToken) return;
+  domSay('Loading...'); $('domRecs').innerHTML = '';
+  try {
+    const q = 'domain=' + encodeURIComponent($('domain').value) + '&token=' + encodeURIComponent(currentToken);
+    const r = await fetch('/api/domain?' + q); const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    domSay(d.note || 'Add these two records at your domain provider (Cloudflare, GoDaddy, Namecheap...), then press Check.', d.note ? 'warn' : '');
+    let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;margin:10px 0">';
+    for (const x of d.records) html += '<tr><td style="padding:6px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--red2);white-space:nowrap">' + x.type + '</td><td style="padding:6px;border-bottom:1px solid var(--line);word-break:break-all"><div style="opacity:.6">Name</div><code>' + esc(x.name) + '</code><div style="opacity:.6;margin-top:4px">Value</div><code>' + esc(x.value) + '</code></td></tr>';
+    html += '</table><div class="btns"><button id="domCheck" class="ghost">Check</button><button id="domReg" class="ghost" style="display:none">Connect domain</button></div><div class="msg" id="domStatus"></div>';
+    $('domRecs').innerHTML = html;
+    fetch('/api/domain/enabled').then(r => r.json()).then(e => { if (e.register) $('domReg').style.display = 'inline-flex'; });
+    $('domCheck').onclick = async () => {
+      $('domStatus').className = 'msg'; $('domStatus').textContent = 'Checking...';
+      const c = await (await fetch('/api/domain/check?' + q)).json();
+      const ok = (b) => (b ? 'OK' : 'not found yet');
+      $('domStatus').className = 'msg ' + (c.live ? 'ok' : 'warn');
+      $('domStatus').textContent = c.live ? 'Live! Open https://' + d.domain + ' on your phone.' : 'TXT record: ' + ok(c.txt) + (c.txtOther ? ' (a different app is set on this domain)' : '') + ' | CNAME: ' + ok(c.cname) + ' | Not live yet. DNS can take a few minutes.';
+    };
+    $('domReg').onclick = async () => {
+      $('domStatus').className = 'msg'; $('domStatus').textContent = 'Connecting...';
+      const rr = await fetch('/api/domain/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ domain: d.domain, token: currentToken }) });
+      const dd = await rr.json();
+      $('domStatus').className = 'msg ' + (rr.ok ? 'ok' : 'err');
+      $('domStatus').textContent = rr.ok ? 'Domain added. The secure certificate takes a few minutes, then press Check.' : dd.error;
+    };
+  } catch (e) { domSay(e.message || 'Something went wrong', 'err'); }
+};
 preview();
 </script>
 </body>
