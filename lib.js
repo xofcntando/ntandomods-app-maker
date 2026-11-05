@@ -338,6 +338,134 @@ Note: Apple and Google may reject apps that are only a thin website wrapper, so 
   out['assets/icon-foreground.png'] = icon1024;
   return out;
 }
+
+async function desktopFiles(cfg) {
+  const { files: pwa } = await pwaFiles(cfg);
+  const id = appId(cfg);
+  const slug = cfg.n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
+  const host = new URL(cfg.u).hostname;
+  const files = {
+    'package.json': JSON.stringify({
+      name: slug, productName: cfg.n, version: '1.0.0', description: `${cfg.n} - created by Ntandomods.INC`,
+      author: 'Ntandomods.INC', homepage: cfg.u, main: 'main.js',
+      scripts: { start: 'electron .', 'dist:win': 'electron-builder --win --publish never', 'dist:mac': 'electron-builder --mac --publish never', 'dist:linux': 'electron-builder --linux --publish never' },
+      devDependencies: { electron: '^33.2.0', 'electron-builder': '^25.1.8' },
+      build: {
+        appId: id, productName: cfg.n, copyright: 'Created by Ntandomods.INC',
+        directories: { buildResources: 'build', output: 'dist' },
+        files: ['main.js', 'config.json', 'offline.html', 'build/icon.png'],
+        win: { target: ['nsis', 'portable'], icon: 'build/icon.png' },
+        mac: { target: 'dmg', icon: 'build/icon.png', category: 'public.app-category.productivity' },
+        linux: { target: 'AppImage', icon: 'build/icon.png', category: 'Network' },
+        nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
+      },
+    }, null, 2),
+    'config.json': JSON.stringify({ url: cfg.u, name: cfg.n, color: cfg.c, fullscreen: cfg.d === 'fullscreen', host }, null, 2),
+    'main.js': `const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
+const path = require('path');
+const cfg = require('./config.json');
+
+if (!app.requestSingleInstanceLock()) app.quit();
+
+let win;
+const sameSite = (u) => { try { const h = new URL(u).hostname; return h === cfg.host || h.endsWith('.' + cfg.host.replace(/^www\\./, '')); } catch { return false; } };
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1280, height: 820, minWidth: 420, minHeight: 500,
+    title: cfg.name, backgroundColor: cfg.color, fullscreen: cfg.fullscreen,
+    icon: path.join(__dirname, 'build', 'icon.png'),
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
+  win.loadURL(cfg.url);
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (sameSite(url)) return { action: 'allow' };
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (e, url) => { if (!sameSite(url) && !url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); } });
+  win.webContents.on('did-fail-load', (_e, code, _d, _u, isMain) => { if (isMain && code !== -3) win.loadFile(path.join(__dirname, 'offline.html'), { query: { url: cfg.url, name: cfg.name } }); });
+}
+
+function buildMenu() {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    { label: 'App', submenu: [
+      { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => win && win.loadURL(cfg.url) },
+      { label: 'Back', accelerator: 'Alt+Left', click: () => win && win.webContents.canGoBack() && win.webContents.goBack() },
+      { label: 'Forward', accelerator: 'Alt+Right', click: () => win && win.webContents.canGoForward() && win.webContents.goForward() },
+      { role: 'togglefullscreen' }, { type: 'separator' }, { role: 'quit' } ] },
+    { role: 'editMenu' },
+    { label: 'Help', submenu: [{ label: 'About ' + cfg.name, click: () => dialog.showMessageBox(win, { type: 'info', title: 'About', message: cfg.name, detail: 'Created by Ntandomods.INC\\n' + cfg.url }) }] },
+  ]));
+}
+
+app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.whenReady().then(() => { buildMenu(); createWindow(); });
+app.on('window-all-closed', () => app.quit());
+app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
+`,
+    'offline.html': `<!doctype html><meta charset="utf-8"><title>Offline</title><body style="margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:${cfg.c};color:#fff;font-family:system-ui,sans-serif;text-align:center"><div style="font-size:22px">Can't reach ${name(cfg)}</div><div style="opacity:.7">Check your internet connection.</div><button onclick="history.length>1?location.href=new URLSearchParams(location.search).get('url'):location.reload()" style="padding:12px 22px;border:0;border-radius:10px;font-size:16px;cursor:pointer">Try again</button><small style="opacity:.5;position:fixed;bottom:16px">Created by Ntandomods.INC</small></body>`,
+    '.github/workflows/build-desktop.yml': `name: Build desktop apps
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, script: 'dist:win' }
+          - { os: macos-latest, script: 'dist:mac' }
+          - { os: ubuntu-latest, script: 'dist:linux' }
+    runs-on: \${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - run: npm run \${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: \${{ matrix.os }}-app
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+`,
+    'README.md': `# ${cfg.n} - desktop app (Windows, macOS, Linux)
+
+_Created by Ntandomods.INC_
+
+This Electron project wraps **${cfg.u}** in a real desktop app. It loads the live site, so updates appear automatically.
+
+## Get the installers (no setup on your PC)
+1. Create a GitHub repo and push this folder to it.
+2. Open the **Actions** tab, run **Build desktop apps**.
+3. Download the artifacts: \`.exe\` (Windows installer and portable), \`.dmg\` (macOS), \`.AppImage\` (Linux).
+
+## Build on your own PC
+\`\`\`
+npm install
+npm start              # run it now
+npm run dist:win       # or dist:mac / dist:linux (build on that OS)
+\`\`\`
+Installers land in the \`dist\` folder.
+
+Notes: Windows may show a SmartScreen warning and macOS a Gatekeeper warning because the app is not code-signed. That is normal for unsigned apps.
+
+**Quick option:** the hosted install link also installs on a PC from Chrome or Edge (install icon in the address bar), with no build needed.
+`,
+  };
+  const out = {};
+  for (const [k, v] of Object.entries(files)) out[k] = Buffer.from(v);
+  out['build/icon.png'] = pwa['icon-512.png'];
+  return out;
+}
 const name = (cfg) => esc(cfg.n);
 
-module.exports = { inspectSite, encodeCfg, decodeCfg, pwaFiles, capacitorFiles, safeFetch, appId };
+module.exports = { inspectSite, encodeCfg, decodeCfg, pwaFiles, capacitorFiles, desktopFiles, safeFetch, appId };

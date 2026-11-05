@@ -5,6 +5,7 @@ Paste a website link, get an installable app.
 - **Install link**: hosted PWA (`/p/<token>/`) you open on a phone and add to the home screen.
 - **PWA zip**: the same app as static files for your own hosting.
 - **Android/iOS project zip**: a Capacitor project plus a GitHub Actions workflow that builds the APK.
+- **PC app zip** (Windows, Mac, Linux): an Electron project plus a GitHub Actions workflow that builds the `.exe`, `.dmg` and `.AppImage` installers.
 
 No database. Every app's settings live inside its link, so it works on Render's free plan with no disk.
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const archiver = require('archiver');
 const path = require('path');
-const { inspectSite, encodeCfg, decodeCfg, pwaFiles, capacitorFiles, appId } = require('./lib');
+const { inspectSite, encodeCfg, decodeCfg, pwaFiles, capacitorFiles, desktopFiles, appId } = require('./lib');
 
 const app = express();
 app.set('strict routing', true);
@@ -45,7 +45,7 @@ app.post('/api/create', limit(30, 60000), (req, res) => {
     const b = req.body || {};
     const cfg = decodeCfg(encodeCfg({ u: b.url, n: b.name, c: b.color, i: b.icon, f: b.framable === false ? 0 : 1, d: b.display, o: b.orientation }));
     const token = encodeCfg(cfg);
-    res.json({ token, appUrl: `/p/${token}/`, pwaZip: `/download/pwa/${token}.zip`, nativeZip: `/download/native/${token}.zip`, appId: appId(cfg) });
+    res.json({ token, appUrl: `/p/${token}/`, pwaZip: `/download/pwa/${token}.zip`, nativeZip: `/download/native/${token}.zip`, desktopZip: `/download/desktop/${token}.zip`, appId: appId(cfg) });
   } catch (e) {
     res.status(400).json({ error: 'Invalid settings' });
   }
@@ -81,8 +81,8 @@ app.get('/download/:kind/:token.zip', limit(10, 60000), async (req, res) => {
   try {
     const cfg = decodeCfg(req.params.token);
     const kind = req.params.kind;
-    if (!['pwa', 'native'].includes(kind)) return res.status(404).end();
-    const files = kind === 'pwa' ? (await pwaFiles(cfg)).files : await capacitorFiles(cfg);
+    if (!['pwa', 'native', 'desktop'].includes(kind)) return res.status(404).end();
+    const files = kind === 'pwa' ? (await pwaFiles(cfg)).files : kind === 'desktop' ? await desktopFiles(cfg) : await capacitorFiles(cfg);
     const slug = cfg.n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
     res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${slug}-${kind}.zip"` });
     const z = archiver('zip', { zlib: { level: 9 } });

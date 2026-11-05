@@ -56,7 +56,7 @@ details{margin-top:12px;color:var(--mute);font-size:14px}summary{cursor:pointer}
 <div class="wrap">
   <nav><div class="logo"><i>N</i>Ntandomods <span>App Maker</span></div></nav>
   <h1>Turn any website into an <em>app</em>.</h1>
-  <p class="lead">Paste a link. Get an installable app for phones and desktops, or a ready-to-build Android/iOS project. Free.</p>
+  <p class="lead">Paste a link. Get an installable app, or a ready-to-build Android, iOS, Windows, Mac or Linux project. Free.</p>
 
   <div class="grid">
     <div class="card">
@@ -89,10 +89,12 @@ details{margin-top:12px;color:var(--mute);font-size:14px}summary{cursor:pointer}
         <div class="btns">
           <a class="btn ghost" id="dlPwa">Download PWA (.zip)</a>
           <a class="btn ghost" id="dlNative">Download Android/iOS project (.zip)</a>
+          <a class="btn ghost" id="dlDesktop">Download PC app: Windows, Mac, Linux (.zip)</a>
         </div>
         <details><summary>Which one do I want?</summary>
           <p><b>Install link</b>: works right now. Open it on your phone, then use <i>Add to Home screen</i> (Android Chrome, iPhone Safari) or the install icon in the desktop address bar.<br><br>
           <b>PWA zip</b>: the same app as static files you can host on your own domain (Netlify, Render static site, any hosting).<br><br>
+          <b>PC app project</b>: an Electron project that builds a real <code>.exe</code> installer (plus Mac and Linux builds). Push it to GitHub and run the included workflow, and the installers are built for you. You can also just install the link from Chrome or Edge on your PC.<br><br>
           <b>Android/iOS project</b>: a Capacitor project that loads your site in a real native shell. Includes a one-click GitHub workflow that builds the <code>.apk</code> for you.</p>
         </details>
       </div>
@@ -171,7 +173,7 @@ $('makeBtn').onclick = async () => {
     const full = location.origin + d.appUrl;
     $('rName').textContent = $('name').value + ' is ready';
     $('rNote').textContent = 'Package id for Android: ' + d.appId;
-    $('openApp').href = d.appUrl; $('dlPwa').href = d.pwaZip; $('dlNative').href = d.nativeZip;
+    $('openApp').href = d.appUrl; $('dlPwa').href = d.pwaZip; $('dlNative').href = d.nativeZip; $('dlDesktop').href = d.desktopZip;
     $('copyBtn').onclick = async () => { await navigator.clipboard.writeText(full); $('copyBtn').textContent = 'Copied!'; setTimeout(() => $('copyBtn').textContent = 'Copy install link', 1500); };
     $('result').style.display = 'block';
     $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
