@@ -1,0 +1,13 @@
+{
+  "name": "site2app",
+  "version": "1.0.0",
+  "description": "Turn any website into an installable app (PWA) or a Capacitor Android/iOS project.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^4.21.2",
+    "sharp": "^0.33.5"
+  }
+}
