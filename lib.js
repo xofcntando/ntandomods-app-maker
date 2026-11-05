@@ -165,6 +165,7 @@ function shellHtml(cfg) {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${name}</title>
 <meta name="theme-color" content="${cfg.c}">
+<meta name="author" content="Ntandomods.INC">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="${name}">
@@ -185,7 +186,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff;pa
 </style>
 </head>
 <body>
-<div id="splash"><img src="icon-192.png" alt=""><div>${name}</div><div class="spin"></div><div class="by">Powered by Ntandomods</div></div>
+<div id="splash"><img src="icon-192.png" alt=""><div>${name}</div><div class="spin"></div><div class="by">Created by Ntandomods.INC</div></div>
 <div id="offline"><div style="font-size:20px">Can't reach ${name}</div><button onclick="location.reload()">Try again</button><a href="${url}">Open site directly</a></div>
 ${cfg.f ? `<iframe id="app" src="${url}" allow="camera; microphone; geolocation; fullscreen; clipboard-write; payment; autoplay" referrerpolicy="origin-when-cross-origin"></iframe>` : ''}
 <script>
@@ -207,7 +208,7 @@ function manifestJson(cfg) {
     id: './',
     name: cfg.n,
     short_name: cfg.n.slice(0, 12),
-    description: `${cfg.n} as an app`,
+    description: `${cfg.n} - created by Ntandomods.INC`,
     start_url: './',
     scope: './',
     display: cfg.d,
@@ -279,7 +280,7 @@ async function capacitorFiles(cfg) {
       server: { url: cfg.u, cleartext: false, allowNavigation: [new URL(cfg.u).hostname, '*.' + new URL(cfg.u).hostname.replace(/^www\./, '')] },
       android: { backgroundColor: cfg.c },
     }, null, 2),
-    'www/index.html': `<!doctype html><meta charset="utf-8"><title>${name(cfg)}</title><body style="background:${cfg.c}"><script>location.replace(${JSON.stringify(cfg.u).replace(/</g, '\\u003c')})</script>`,
+    'www/index.html': `<!doctype html><meta charset="utf-8"><title>${name(cfg)}</title><body style="background:${cfg.c};color:#fff;font-family:sans-serif;text-align:center;padding-top:40vh"><div>${name(cfg)}</div><small style="opacity:.6">Created by Ntandomods.INC</small><script>location.replace(${JSON.stringify(cfg.u).replace(/</g, '\\u003c')})</script>`,
     '.github/workflows/build-apk.yml': `name: Build Android APK
 on:
   workflow_dispatch:
@@ -306,7 +307,7 @@ jobs:
 `,
     'README.md': `# ${cfg.n} - native app wrapper
 
-_Made with Ntandomods App Maker._
+_Created by Ntandomods.INC_
 
 This project wraps **${cfg.u}** in a real Android/iOS app using [Capacitor](https://capacitorjs.com).
 The app loads the live site, so site updates show up in the app automatically.
